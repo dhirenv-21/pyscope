@@ -1,45 +1,34 @@
 """
-PyScope — Desktop Launcher
+PyScope -- Desktop Launcher
 ============================
-Launches the Streamlit app and opens it in the default browser.
+Launches the Streamlit app directly (works both as .py and as frozen .exe).
 Double-click the .exe (or run this script) to start PyScope.
 """
 
 import os
 import sys
+import io
 import time
-import socket
-import subprocess
-import webbrowser
 import threading
-
-
-def _find_free_port(start: int = 8501, end: int = 8599) -> int:
-    """Find an available port in the given range."""
-    for port in range(start, end):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
-                s.bind(("127.0.0.1", port))
-                return port
-            except OSError:
-                continue
-    return 8501
-
-
-def _wait_for_server(port: int, timeout: int = 30):
-    """Block until the Streamlit server is accepting connections."""
-    start = time.time()
-    while time.time() - start < timeout:
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=1):
-                return True
-        except (ConnectionRefusedError, OSError):
-            time.sleep(0.3)
-    return False
+import webbrowser
 
 
 def main():
-    # Determine project directory
+    # ── Force UTF-8 output so Unicode chars survive on Windows consoles ──
+    if sys.stdout is None or (hasattr(sys.stdout, "encoding") and sys.stdout.encoding != "utf-8"):
+        try:
+            sys.stdout = io.TextIOWrapper(
+                sys.stdout.buffer if hasattr(sys.stdout, "buffer") else open(os.devnull, "wb"),
+                encoding="utf-8", errors="replace", line_buffering=True,
+            )
+            sys.stderr = io.TextIOWrapper(
+                sys.stderr.buffer if hasattr(sys.stderr, "buffer") else open(os.devnull, "wb"),
+                encoding="utf-8", errors="replace", line_buffering=True,
+            )
+        except Exception:
+            pass  # Absolute worst case: leave stdout as-is
+
+    # ── Determine base directory ──────────────────────────────────────────
     if getattr(sys, "frozen", False):
         # Running as PyInstaller bundle
         base_dir = sys._MEIPASS
@@ -47,51 +36,43 @@ def main():
         base_dir = os.path.dirname(os.path.abspath(__file__))
 
     app_path = os.path.join(base_dir, "app.py")
-    port = _find_free_port()
+    port = "8501"
     url = f"http://localhost:{port}"
 
     print("=" * 50)
-    print("  ⬡  PyScope — Code Execution & Profiling Tool")
+    print("  PyScope -- Code Execution & Profiling Tool")
     print("=" * 50)
     print(f"  Starting server on {url} ...")
     print("  Close this window to stop PyScope.")
     print("=" * 50)
 
-    # Launch Streamlit as a subprocess
-    cmd = [
-        sys.executable, "-m", "streamlit", "run", app_path,
-        "--server.port", str(port),
-        "--server.headless", "true",
-        "--server.address", "localhost",
-        "--browser.gatherUsageStats", "false",
-        "--theme.base", "dark",
-    ]
-
-    env = os.environ.copy()
-    proc = subprocess.Popen(
-        cmd, env=env,
-        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-    )
-
-    # Wait for server to be ready, then open browser
+    # ── Auto-open browser after a short delay ─────────────────────────────
     def _open_browser():
-        if _wait_for_server(port):
-            print(f"\n  ✓ PyScope is running at {url}")
-            print("  Opening browser...\n")
-            webbrowser.open(url)
-        else:
-            print("\n  ✗ Server failed to start. Check the console for errors.")
+        time.sleep(4)
+        print(f"\n  -> Opening browser at {url}")
+        webbrowser.open(url)
 
     threading.Thread(target=_open_browser, daemon=True).start()
 
-    # Keep running until user closes the terminal / presses Ctrl+C
-    try:
-        proc.wait()
-    except KeyboardInterrupt:
-        print("\n  Shutting down PyScope...")
-        proc.terminate()
-        proc.wait(timeout=5)
-        print("  Done.")
+    # ── Boot Streamlit directly in this process ───────────────────────────
+    # Force production mode — PyInstaller bundles streamlit source which
+    # causes it to incorrectly detect developmentMode=true.
+    os.environ["STREAMLIT_GLOBAL_DEVELOPMENT_MODE"] = "false"
+    os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
+
+    sys.argv = [
+        "streamlit", "run", app_path,
+        "--global.developmentMode", "false",
+        "--server.port", port,
+        "--server.headless", "true",
+        "--server.address", "localhost",
+        "--browser.gatherUsageStats", "false",
+        "--browser.serverAddress", "localhost",
+        "--theme.base", "dark",
+    ]
+
+    from streamlit.web import cli as stcli
+    stcli.main()
 
 
 if __name__ == "__main__":
