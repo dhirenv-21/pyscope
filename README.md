@@ -42,6 +42,13 @@ The app will open at `http://localhost:8501`.
 python launcher.py
 ```
 
+### Optional: Build a Standalone .exe
+```bash
+pip install pyinstaller
+pyinstaller pyscope.spec
+```
+The executable is written to `dist/`.
+
 ## 🛠️ Tech Stack
 
 | Component | Technology |
@@ -64,7 +71,11 @@ pyscope/
 ├── ui_components.py       # HTML/CSS UI component renderers
 ├── ui_styles.py           # Complete CSS design system
 ├── launcher.py            # Desktop launcher script
+├── pyscope.spec           # PyInstaller build spec
 ├── requirements.txt       # Python dependencies
+├── main_25.py … main_100.py  # Milestone prototypes (25% → 100%)
+├── execution_monitor.py   # Earliest tracer prototype
+├── docs/                  # Abstract, review slides and final report
 └── .streamlit/
     └── config.toml        # Streamlit server configuration
 ```
