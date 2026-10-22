@@ -25,7 +25,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/pyscope.git
+git clone https://github.com/dhirenv-21/pyscope.git
 cd pyscope
 
 # Install dependencies
